@@ -7,6 +7,7 @@ const INDEX = "/public/index.html";
 const app = express();
 const white = "rgb(255,255,255)";
 
+// TODO: add error handling
 const server = app
   .use(express.static("public"))
   .get("/", (req, res) => res.sendFile(INDEX, { root: __dirname }))
@@ -59,12 +60,13 @@ wss.on("connection", ws => {
       }
       ws.send(JSON.stringify({ type: "patternCells", value: cellColors }));
     } else {
+      // TODO: control for multuple users
       console.log(jsonMsg.cellIndex, jsonMsg.color);
       cellColors[jsonMsg.cellIndex] = jsonMsg.color;
       ws.send(JSON.stringify({ type: "cellColors", value: cellColors }));
     }
   });
-  // remove client info when it is disconnected
+  // TODO: remove client info when it is disconnected
   ws.on("close", () => console.log("Client disconnected"));
 });
 
@@ -90,7 +92,7 @@ const block = (color, emptyCellIndex) => {
     }
   }
 };
-// glider
+// TODO: glider
 const glider = (color, emptyCellIndex) => {};
 
 // generate random color
