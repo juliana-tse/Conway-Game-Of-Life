@@ -3,17 +3,29 @@ var clientColor;
 
 ws.onmessage = function incoming(message) {
   var json = JSON.parse(message.data);
-  if (json.type == "color") {
-    window.clientColor = json.value;
-    alert(
-      "Please select the cells within 5 secs (the board will be frozen for cells selection)"
-    );
-  } else if (json.type == "cellColors") updateGrid(json.value);
-  else if (json.type == "patternCells") {
-    updateGrid(json.value);
-    ws.send(JSON.stringify({ type: "next", color: window.clientColor }));
-  } else console.log("Unrecognized message from server");
+  switch (json.type) {
+    case "color":
+      window.clientColor = json.value;
+      if (json.gameStarted) {
+        var startButton = document.getElementById("start-button");
+        startButton.disabled = true;
+        alert("The game has started already, please wait for the next game.");
+      }
+      break;
+    case "cellColors":
+    case "patternCells":
+      updateGrid(json.value);
+      break;
+    case "started":
+      var startButton = document.getElementById("start-button");
+      startButton.disabled = true;
+      break;
+    default:
+      console.log("Unrecognized message from server");
+  }
 };
+
+const start = () => ws.send(JSON.stringify({ type: "next" }));
 
 const blinker = () =>
   ws.send(
@@ -23,6 +35,7 @@ const blinker = () =>
       color: window.clientColor
     })
   );
+
 const block = () =>
   ws.send(
     JSON.stringify({
@@ -31,6 +44,7 @@ const block = () =>
       color: window.clientColor
     })
   );
+
 const glider = () =>
   ws.send(
     JSON.stringify({
@@ -79,10 +93,6 @@ var grid = clickableGrid(20, 20, function(el, i) {
   el.style.backgroundColor = window.clientColor;
   ws.send(
     JSON.stringify({ type: "click", cellIndex: i, color: window.clientColor })
-  );
-  setTimeout(
-    () => ws.send(JSON.stringify({ type: "next", color: window.clientColor })),
-    5000
   );
 });
 

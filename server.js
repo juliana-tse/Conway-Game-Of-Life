@@ -7,7 +7,6 @@ const INDEX = "/public/index.html";
 const app = express();
 const white = "rgb(255,255,255)";
 
-// TODO: add error handling
 const server = app
   .use(express.static("public"))
   .get("/", (req, res) => res.sendFile(INDEX, { root: __dirname }))
@@ -26,6 +25,7 @@ wss.getUniqueID = () => {
 
 // initialize all cell colors as white
 const cellColors = Array.apply(null, Array(400)).map(_ => white);
+var gameHasStarted = false;
 wss.on("connection", ws => {
   console.log("Client connected");
   // when new user has chosen the cells
@@ -35,43 +35,59 @@ wss.on("connection", ws => {
     console.log("Client.ID: " + client.id);
     console.log("Client.Color: " + client.color);
   });
-  ws.send(JSON.stringify({ type: "color", value: ws.color }));
+  ws.send(
+    JSON.stringify({
+      type: "color",
+      value: ws.color,
+      gameStarted: gameHasStarted
+    })
+  );
   ws.send(JSON.stringify({ type: "cellColors", value: cellColors }));
   ws.on("message", message => {
     var jsonMsg = JSON.parse(message);
-    if (jsonMsg.type === "next") {
-      setInterval(() => {
-        nextGeneration();
-        produceNextGrid();
-        ws.send(JSON.stringify({ type: "cellColors", value: cellColors }));
-      }, 1000);
-    } else if (jsonMsg.type === "pattern") {
-      var emptyCellIndex = cellColors.findIndex(color => color === white);
-      switch (jsonMsg.pattern) {
-        case "blinker":
-          blinker(jsonMsg.color, emptyCellIndex);
-          break;
-        case "block":
-          block(jsonMsg.color, emptyCellIndex);
-          break;
-        case "glider":
-          glider(jsonMsg.color, emptyCellIndex);
-          break;
-      }
-      ws.send(JSON.stringify({ type: "patternCells", value: cellColors }));
-    } else {
-      // TODO: control for multuple users
-      console.log(jsonMsg.cellIndex, jsonMsg.color);
-      cellColors[jsonMsg.cellIndex] = jsonMsg.color;
-      ws.send(JSON.stringify({ type: "cellColors", value: cellColors }));
+    switch (jsonMsg.type) {
+      case "next":
+        // inform all clients that the game has started
+        wss.clients.forEach(client =>
+          client.send(JSON.stringify({ type: "started" }))
+        );
+        gameHasStarted = true;
+        setInterval(() => {
+          nextGeneration();
+          produceNextGrid();
+          wss.clients.forEach(client =>
+            client.send(
+              JSON.stringify({ type: "cellColors", value: cellColors })
+            )
+          );
+        }, 1000);
+        break;
+      case "pattern":
+        var emptyCellIndex = cellColors.findIndex(color => color === white);
+        switch (jsonMsg.pattern) {
+          case "blinker":
+            blinker(jsonMsg.color, emptyCellIndex);
+            break;
+          case "block":
+            block(jsonMsg.color, emptyCellIndex);
+            break;
+          case "glider":
+            glider(jsonMsg.color, emptyCellIndex);
+            break;
+        }
+      default:
+        cellColors[jsonMsg.cellIndex] = jsonMsg.color;
+        wss.clients.forEach(client =>
+          client.send(JSON.stringify({ type: "cellColors", value: cellColors }))
+        );
     }
   });
-  // TODO: remove client info when it is disconnected
   ws.on("close", () => console.log("Client disconnected"));
 });
 
 // blinker
 const blinker = (color, emptyCellIndex) => {
+  // modify emptyCellIndex to make it valid as a cell in blinker
   if (emptyCellIndex % 20 === 0) emptyCellIndex++;
   if (emptyCellIndex % 20 === 19) emptyCellIndex--;
   cellColors[emptyCellIndex] = color;
@@ -82,8 +98,10 @@ const blinker = (color, emptyCellIndex) => {
     emptyCellIndex + 20 <= 399 ? emptyCellIndex + 20 : emptyCellIndex - 40;
   cellColors[thirdCellIndex] = color;
 };
+
 // block
 const block = (color, emptyCellIndex) => {
+  // determine the direction of expansion of block
   const negateC = emptyCellIndex % 20 < 19 ? 1 : -1;
   const negateR = emptyCellIndex - 20 < 0 ? 1 : -1;
   for (r = 0; r < 2; r++) {
@@ -92,8 +110,27 @@ const block = (color, emptyCellIndex) => {
     }
   }
 };
-// TODO: glider
-const glider = (color, emptyCellIndex) => {};
+
+// glider
+const glider = (color, emptyCellIndex) => {
+  // modify emptyCellIndex to make it valid as (1,1) cell in glider
+  if (emptyCellIndex % 20 > 17) {
+    emptyCellIndex -= 2;
+  }
+  if (emptyCellIndex + 40 > 399) {
+    emptyCellIndex -= 40;
+  }
+  // 1,1
+  cellColors[emptyCellIndex] = color;
+  // 2,2
+  cellColors[emptyCellIndex + 21] = color;
+  // 3,2
+  cellColors[emptyCellIndex + 41] = color;
+  // 1,3
+  cellColors[emptyCellIndex + 2] = color;
+  // 2,3
+  cellColors[emptyCellIndex + 22] = color;
+};
 
 // generate random color
 function generateRandomColor() {
@@ -107,6 +144,7 @@ function generateRandomColor() {
 
 const isAlive = cellNumber => cellColors[cellNumber] !== white;
 
+// calculate color average
 const colorAverage = colors => {
   return (
     "rgb(" +
@@ -121,6 +159,7 @@ const colorAverage = colors => {
   );
 };
 
+// get number of neighbours and average color
 const neighbours = (row, col) => {
   var count = 0;
   var neighbourColorList = [];

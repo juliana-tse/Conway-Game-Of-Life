@@ -5,13 +5,20 @@
     <meta charset="utf-8" />
   </head>
   <body>
-    <!-- table of buttons -->
-    <div>
+    <div id="outer-box">
       <div id="grid-div"></div>
-      <div>
+      <div id="toolbar">
+        <h2>Instructions</h2>
+        <p>
+          Please click on the cells for initial pattern or select one of the
+          predefined patterns below. Then, please click 'Start'.
+        </p>
+        <h3 id="toolbar-title">Predefined Patterns</h3>
         <button onclick="blinker()">Blinker</button>
         <button onclick="block()">Block</button>
         <button onclick="glider()">Glider</button>
+        <div id="divider"></div>
+        <button id="start-button" onclick="start()">Start</button>
       </div>
     </div>
     <script src="./javascripts/client.js"></script>
