@@ -1,4 +1,5 @@
-const ws = new WebSocket("ws://localhost:3030");
+var HOST = location.origin.replace(/^http/, "ws");
+const ws = new WebSocket(HOST);
 var clientColor;
 
 ws.onmessage = function incoming(message) {
